@@ -1,0 +1,1 @@
+{"version":"0.0.1","header":{"source":"AI-SoC","destination":"DCU-IVI","msg_type":"Request","ack_required":"Yes"},"request":{"serviceName":"MusicRequest","parameters":{"gener":"jazz","song_title":"","singer":"","albumTitle":"Alarm_Beep_03.ogg","actor":"","text":"True","type":"PLAY"}},"response":{"serviceName":"","response":"","reason":""}}

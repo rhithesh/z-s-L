@@ -1,0 +1,32 @@
+
+{
+    "version": "0.0.1",
+    "header":
+    {
+        "source": "AI-SoC",
+        "destination": "DCU-IVI",
+        "msg_type":"Request",
+        "ack_required": "Yes"
+    },
+    "request":
+    {
+        "service_name": "PlaySong", [StopSong, PauseSong, VoiceOver, PhoneCall]
+        "parameters":
+        {
+            "gener": "",
+            "song_title": "",
+            "singer": "",
+            "albumTitle": "",
+            "actor": "", 
+            "text": "", [True/ False]
+            "chunks": ",
+            "phone_number": xxxxxxx,
+            "phone_contact": "Contact name"      
+    },
+    "response":
+    {
+        "service_name": "",
+        "response": "",
+        "reason": ""
+    }
+}
