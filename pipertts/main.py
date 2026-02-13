@@ -176,5 +176,5 @@ class PiperTTS(DMSLMMain):
         self.main.textOutputQueue.put(None)
         self.text_processor_thread.join()
 
-        self.audio_queue.put(None)
+        self.main.piper_audio_queue.put(None)
         self.audio_player_thread.join()

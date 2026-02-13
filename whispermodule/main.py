@@ -42,7 +42,7 @@ class VoiceInput(DMSLMMain):
         self.stop_event = threading.Event()
 
 
-        self.device_index = 0
+        self.device_index = None
 
         self.listener_thread = threading.Thread(
             target=self._listen, daemon=True

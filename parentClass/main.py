@@ -16,18 +16,18 @@ import wave
 import numpy as np
 import requests
 
+#
+# def watch_text_queue(q, name="TEXT"):
+#     last = -1
+#     while True:
+#         size = q.qsize()
+#         if size != last:
+#             print(f"[{name} QUEUE] size = {size}")
+#             last = size
+#         time.sleep(0.05)
 
-def watch_text_queue(q, name="TEXT"):
-    last = -1
-    while True:
-        size = q.qsize()
-        if size != last:
-            print(f"[{name} QUEUE] size = {size}")
-            last = size
-        time.sleep(0.05)
 
-
-
+#this is for debuging we use this to se what is going inside and outside the queue in real time
 class DebugQueue(queue.Queue):
     def put(self, item, *args, **kwargs):
         print(f"[QUEUE PUT] {item!r}")
@@ -93,11 +93,11 @@ class  DMSLMMain():
         self.audio_player_thread.start()
 
         threading.Thread(target=self.display_queue, daemon=True).start()
-        threading.Thread(
-    target=watch_text_queue,
-    args=(self.textOutputQueue, "TEXT"),
-    daemon=True
-).start()
+#         threading.Thread(
+#     target=watch_text_queue,
+#     args=(self.textOutputQueue, "TEXT"),
+#     daemon=True
+# ).start()
 
 
 
@@ -105,6 +105,7 @@ class  DMSLMMain():
 
 
     def display_queue(self):
+        """ This method is used to monitor the session and end it if there is no activity for 7 seconds, This is run as a thread on line 94"""
 
         print("Starting display queue thread...")
         while True:
@@ -112,6 +113,8 @@ class  DMSLMMain():
           #print("Session-Active",self.session)
           #print("User-Can-Speak",self.UserCanSpeak)
           #print(time.time() - self.last_active_time )
+          
+          #if session is true and no activity for 7 seconds then end the session and play the end of session audio
           if self.session and time.time() - self.last_active_time > 7:
                 sd.stop()
                 sd.play(self.data, self.sr)
@@ -125,6 +128,7 @@ class  DMSLMMain():
                
 
     def enable_session_nd_mic(self):
+      """ This is a public method is used to enable the session and mic"""
       self.last_active_time=time.time() 
       self.UserCanSpeak=True
       self.messages=[]
