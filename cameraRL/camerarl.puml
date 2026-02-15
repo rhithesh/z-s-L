@@ -1,0 +1,166 @@
+@startuml CameraRL_Architecture
+
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F0F0F0
+skinparam classBorderColor #333333
+skinparam arrowColor #333333
+
+title Camera Module Architecture - cameraRL/main.py
+
+package "Parent Class" {
+    class DMSLMMain {
+        --Attributes--
+        FRAME_HEIGHT: int = 480
+        FRAME_WIDTH: int = 640
+        FRAME_CHANNELS: int = 3
+        RING_BUFFER_SIZE: int = 3
+        shared_frames: np.ndarray[3, 480, 640, 3]
+        UserCanSpeak: bool
+        messages: list[str]
+        session: bool
+        last_active_time: float
+        --Queues--
+        imageQueue: Queue
+        processdImageJsonQueue: Queue
+        textOutputQueue: Queue
+        event_queue: Queue
+        Dataqueue: Queue
+        piper_audio_queue: Queue
+        toolResponseCacheq: Queue
+        --Methods--
+        display_queue()
+        enable_session_nd_mic()
+        _main_play_audio()
+        clearCacheOnEndOfSession()
+    }
+}
+
+package "Camera Module" {
+    class CameraRL {
+        --Attributes--
+        main: DMSLMMain
+        fps: int = 7
+        running: bool = True
+        cap: cv2.VideoCapture
+        thread: threading.Thread
+        --Methods--
+        __init__(main: DMSLMMain, fps: int = 7): void
+        read_images(): void
+        stop(): void
+    }
+    
+    class "Frame Processing Pipeline" as FrameProcessor {
+        --Steps--
+        1. Capture frame from camera
+        2. Resize: Original → 320x240
+        3. Encode: RGB → JPEG (quality=70%)
+        4. Serialize: bytes data
+        5. Queue: Add to imageQueue
+        
+        --Timing--
+        frame_interval = 1.0 / fps
+        Sleep control for exact FPS
+    }
+}
+
+class "cv2.VideoCapture" as OpenCV_Capture {
+    --External Dependency--
+    int(0): Default system camera
+    Methods:
+    - isOpened()
+    - read() → (ret, frame)
+    - release()
+}
+
+class "Frame Data Structure" as FrameData {
+    --Queue Item Format--
+    {{
+    "filename": "frame.jpg"
+    "time": str (milliseconds)
+    "bytes": bytes (JPEG encoded)
+    }}
+}
+
+class "Threading" as ThreadingModule {
+    --External Dependency--
+    Thread(target, daemon=True)
+}
+
+class "Image Encoding" as ImageEncoding {
+    --OpenCV Functions--
+    cv2.resize(frame, (320, 240))
+    cv2.imencode(".jpg", img, quality=70)
+}
+
+' Relationships
+CameraRL --|> DMSLMMain : inherits from
+CameraRL --> OpenCV_Capture : initializes with
+CameraRL --> ThreadingModule : creates daemon
+CameraRL --> FrameProcessor : executes in thread
+FrameProcessor --> ImageEncoding : applies
+FrameProcessor --> FrameData : produces
+FrameData --> DMSLMMain : enqueued to\nimageQueue
+
+' Sequence flow
+note right of CameraRL::__init__
+    **Initialization Flow:**
+    1. Store reference to main DMSLMMain
+    2. Set FPS target
+    3. Initialize running = True
+    4. Open cv2.VideoCapture(0)
+    5. Verify camera opened (RuntimeError if not)
+    6. Create daemon thread for read_images()
+    7. Start thread
+end note
+
+note left of FrameProcessor
+    **read_images() Thread Execution:**
+    - Runs as daemon thread
+    - Continuous loop while running=True
+    - Frame interval = 1.0 / fps (default 7 fps = ~143ms)
+    
+    **Per-Frame Processing:**
+    1. Measure start time
+    2. Capture ret, frame from camera
+    3. Skip frame if ret=False
+    4. Generate timestamp (milliseconds)
+    5. Resize frame: 640x480 → 320x240
+    6. JPEG encode with 70% quality
+    7. Put frame dict to main.imageQueue
+    8. Calculate sleep time
+    9. Sleep to maintain FPS
+end note
+
+note right of FrameData
+    **Queue Data Structure:**
+    - filename: "frame.jpg" (constant)
+    - time: Unix timestamp in milliseconds
+    - bytes: JPEG compressed image bytes
+    
+    **Compression Details:**
+    - Resolution: 320x240
+    - Format: JPEG
+    - Quality: 70%
+    - Reduces bandwidth for transmission
+end note
+
+note right of CameraRL::stop
+    **Cleanup Process:**
+    1. Set running = False
+    2. Join thread (wait for completion)
+    3. Release camera (cv2.release())
+    
+    **Safety:**
+    - Graceful shutdown
+    - Prevents thread hanging
+    - Releases system resources
+end note
+
+legend right
+    |<#FFE4E1> Data Types | Class/Structure |
+    |<#E4F0FF> Methods | Function/Operation |
+    |<#E4FFE4> External | Dependencies |
+    |<#FFFACD> Flow | Processing Pipeline |
+end legend
+
+@enduml

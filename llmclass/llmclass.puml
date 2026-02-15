@@ -1,0 +1,102 @@
+@startuml llmclass_diagram
+title LLMClass Architecture
+
+package "llmclass" {
+
+    class LLMClass {
+        - main: DMSLMMain
+        - fail_rate: int = 0
+        - closed_counter: int = 0
+        - stoper: int = 1
+        - drow_event_time: list
+
+        --
+        + __init__(main: DMSLMMain)
+        + analyze_llm_call_need() : void
+        + play_wav(filename: str, time_of_file: float) : void
+        + clear_queue_and_stop(q: Queue, num_consumers: int) : void
+    }
+
+    class DrowsinesDetector {
+        - closed_counter: int
+        - fail_rate: int
+        - threshold: int = 10
+
+        --
+        - check_eye_state(left: str, right: str) : bool
+        - update_counter(state: bool) : void
+        - should_trigger_llm() : bool
+    }
+
+    class AudioHandler {
+        - piper_audio_queue: Queue
+
+        --
+        + play_alert_sound(filename: str) : void
+        + play_emergency_sound(filename: str) : void
+        + play_drowsy_wake_sound(filename: str) : void
+    }
+}
+
+package "parent" {
+
+    class DMSLMMain {
+        - processdImageJsonQueue: Queue
+        - event_queue: Queue
+        - messages: list
+        - UserCanSpeak: bool
+        - session: bool
+        - last_active_time: float
+        - piper_audio_queue: Queue
+    }
+}
+
+package "config" {
+    interface SYSTEMPROMPT
+}
+
+package "Monitoring Flow" {
+
+    note right of LLMClass {
+        1. Continuously reads from processdImageJsonQueue
+        2. Monitors eye state (left_eye, right_eye)
+        3. Counts consecutive closed-eye frames
+        4. Triggers LLM when closed_counter >= 10
+        5. Manages fail_rate for escalation
+        6. Plays audio alerts and wakes driver
+    }
+}
+
+' Relationships
+
+LLMClass *-- DrowsinesDetector : uses
+LLMClass *-- AudioHandler : uses
+LLMClass --> DMSLMMain : accesses queues
+AudioHandler --> DMSLMMain : puts audio to queue
+
+note right of DrowsinesDetector {
+    Eye State Detection:
+    - Tracks consecutive closed-eye frames
+    - Resets counter when eyes open
+    - Triggers when threshold reached
+    - Escalates with fail_rate
+
+    Escalation Levels:
+    - Level 1: drowwake.wav (9s)
+    - Level 2: alert.wav
+    - Level 3+: emergencyvoice.wav (10.7s)
+}
+
+note right of AudioHandler {
+    Audio Files Used:
+    - drowwake.wav (9 seconds)
+    - alert.wav
+    - emergencyvoice.wav (10.7 seconds)
+
+    Audio Format Processing:
+    - Read WAV file with scipy.io.wavfile
+    - Support for 8-bit, 16-bit, 32-bit
+    - Queue for async playback
+}
+
+@enduml

@@ -1,0 +1,100 @@
+@startuml chat_py_diagram
+title Chat.py Architecture
+
+package "helper" {
+
+    class Helper {
+        - main: DMSLMMain
+        - url: str = "http://127.0.0.1:5000/v1/chat/completions"
+        - model: str = "google/gemma-3-12b-it"
+        - mcp_client: MCPClient
+        - mcp: Optional[MCPClient]
+
+        --
+        + __init__(main: DMSLMMain)
+        + _play_wav(filename: str, time_of_file: float)
+        + extract_tool_block(response: str) -> (str, dict)
+        + start_mcp() : async
+        + tool_check_CALL(full_response: str) : async
+        + get_mcp() -> MCPClient : async
+        + chatLLM(messages: list) : async
+    }
+
+    class StreamProcessor {
+        - stream_state: str = "UNKNOWN"
+        - full_response: str = ""
+        - buffer: str = ""
+
+        --
+        + process_chunk(delta: str) : void
+        + determine_state(buffer: str) : str
+        + handle_tool_response(response: str) : void
+        + handle_text_response(response: str) : void
+    }
+}
+
+package "parent" {
+
+    class DMSLMMain {
+        - messages: list
+        - textOutputQueue: Queue
+        - piper_audio_queue: Queue
+        - Dataqueue: Queue
+        - event_queue: Queue
+        - UserCanSpeak: bool
+        - session: bool
+
+        --
+        + clearCacheOnEndOfSession()
+    }
+}
+
+package "mcp" {
+
+    class MCPClient {
+        - session: Optional[Session]
+
+        --
+        + connect_to_server(path: str) : async
+        + call_tool(tool_name: str, args: dict) : async
+    }
+}
+
+package "API" {
+
+    interface LLMStreamAPI {
+        + POST /v1/chat/completions
+        + stream: true
+        + temperature: 0.7
+        + max_tokens: 100
+        + tools: [PLAY_SONG, CALL_CONTACT]
+    }
+}
+
+note right of Helper {
+    Manages LLM chat interactions
+    Streams responses from LLM API
+    Routes tool calls to MCP
+    Handles audio playback
+}
+
+note right of StreamProcessor {
+    Processes streaming data:
+    - Buffers delta chunks
+    - Detects TOOL vs TEXT
+    - Routes to handlers
+}
+
+' Relationships
+
+Helper --> DMSLMMain : uses
+Helper --> MCPClient : uses mcp_client
+Helper --> LLMStreamAPI : sends POST requests
+Helper --> StreamProcessor : delegates streaming
+
+MCPClient --> MCPClient : singleton pattern
+
+LLMStreamAPI -.-> Helper : streams response chunks
+Helper --> Helper : tool_check_CALL internal call
+
+@enduml

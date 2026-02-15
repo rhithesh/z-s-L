@@ -1,0 +1,115 @@
+@startuml pipertts_diagram
+title PiperTTS - Text-to-Speech Pipeline
+
+package "pipertts" {
+
+    class PiperTTS {
+        - main: DMSLMMain
+        - stop_event: threading.Event
+        - audio_queue: queue.Queue
+        - TTS_URL: str = "http://127.0.0.1:5000/v1/audio/speech"
+        - text_processor_thread: Thread
+        - audio_player_thread: Thread
+
+        --
+        + __init__(main: DMSLMMain)
+        + _process_text() : void
+        + _tts_request(text: str) : void
+        + _play_audio() : void
+        + finish() : void
+    }
+
+    class TextProcessor {
+        - buffer: str
+        - sentence_re: regex = r"(.+?[.!?])"
+
+        --
+        - collect_chunks() : str
+        - detect_sentence(buffer: str) : str
+        - extract_sentence() : str
+    }
+
+    class TTSRequestHandler {
+        - TTS_URL: str
+        - response_format: str = "pcm"
+
+        --
+        - build_payload(text: str) : dict
+        - make_request(payload: dict) : Response
+        - stream_audio_chunks() : bytes
+    }
+}
+
+package "parent" {
+
+    class DMSLMMain {
+        - textOutputQueue: Queue
+        - piper_audio_queue: Queue
+        - Dataqueue: Queue
+        - last_active_time: float
+        - UserCanSpeak: bool
+    }
+}
+
+package "config" {
+
+    class voice_message {
+        - request: dict
+        - parameters: dict
+    }
+}
+
+package "External API" {
+
+    interface PiperTTSAPI {
+        + POST /v1/audio/speech
+        + input: str
+        + voice: str
+        + language: str
+        + response_format: str = "pcm"
+        + Returns: audio stream (PCM)
+    }
+}
+
+note right of TextProcessor {
+    Text Buffering & Sentence Detection:
+
+    1. Reads from textOutputQueue
+    2. Accumulates chunks in buffer
+    3. Uses regex pattern to detect sentences (. ! ?)
+    4. Extracts complete sentence
+    5. Sends to TTS
+    6. None signal = flush buffer & send
+
+    Performance:
+    - Measures sentence detection time
+    - Measures TTS latency per sentence
+}
+
+note right of TTSRequestHandler {
+    HTTP TTS Request:
+
+    1. Build JSON payload with text
+    2. Stream POST to Piper TTS API
+    3. Receive PCM audio chunks
+    4. Queue chunks to piper_audio_queue
+
+    Output Signals:
+    - Audio chunks: PCM bytes
+    - End signal: b"__TTS_END__"
+    - Also puts voice_message to Dataqueue
+    - Updates last_active_time
+}
+
+' Relationships
+
+PiperTTS *-- TextProcessor : uses
+PiperTTS *-- TTSRequestHandler : uses
+TTSRequestHandler --> PiperTTSAPI : HTTP POST
+PiperTTS --> voice_message : references
+
+PiperTTS --> DMSLMMain : reads textOutputQueue
+PiperTTS --> DMSLMMain : writes piper_audio_queue
+PiperTTS --> DMSLMMain : writes Dataqueue
+
+@enduml

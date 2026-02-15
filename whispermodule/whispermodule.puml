@@ -1,0 +1,102 @@
+@startuml whispermodule_diagram
+title WhisperModule - Voice Input & Transcription System
+
+package "whispermodule" {
+
+    class VoiceInput {
+        - main: DMSLMMain
+        - wakeWords: list = ["Hey Friend", "Hello Friend", "Hi Friend", "Heyy friend"]
+
+        - SAMPLE_RATE: int = 48000
+        - BLOCK_SIZE: int = 2048
+        - SILENCE_TIMEOUT: float = 0.7
+        - RMS_THRESHOLD: float = 0.015
+        - MIN_SPEECH_SEC: float = 0.30
+
+        - audio_queue: Queue
+        - speech_buffer: np.ndarray
+        - speaking: bool = False
+        - stop_event: threading.Event
+        - listener_thread: Thread
+
+        --
+        + __init__(main, device_index, device_name_hint)
+        + wakeWorDetector(text: str) -> bool
+        + _rms(audio: np.ndarray) -> float
+        + _resolve_device_index(device_index, name_hint) -> int
+        + _audio_callback(indata, frames, time_info, status)
+        + _listen() : void
+        + _process_audio_chunk(chunk: np.ndarray) : void
+        + _transcribe_and_send() : void
+        + _clear_audio_state() : void
+        + stop() : void
+    }
+
+    class WakeWordDetector {
+        - wakeWords: list
+        - cutoff: float = 0.6
+        --
+        + detect(text: str) -> bool
+        - match_close_strings(text: str) -> bool
+    }
+
+    class AudioProcessor {
+        - speech_buffer: np.ndarray
+        - RMS_THRESHOLD: float
+        --
+        + calculate_rms(audio: np.ndarray) -> float
+        + is_speech(rms: float) -> bool
+        + buffer_audio(chunk: np.ndarray) : void
+        + get_duration() -> float
+    }
+
+    class TranscriptionClient {
+        - api_url: str = "http://127.0.0.1:5000/v1/audio/transcriptions"
+        - language: str = "en"
+        --
+        + send_audio(audio_buffer: bytes) -> str
+        - convert_to_pcm16(float32_audio) -> bytes
+        - write_wav_file(audio_bytes) -> str
+        - call_transcription_api(wav_file) -> dict
+    }
+}
+
+package "parent" {
+    class DMSLMMain {
+        - messages: list
+        - session: bool
+        - UserCanSpeak: bool
+        - last_active_time: float
+    }
+}
+
+package "External Services" {
+    interface TranscriptionAPI {
+        + POST /v1/audio/transcriptions
+        + file: audio/wav
+        + language: str
+        + Returns: {"text": str}
+    }
+
+    interface MessageAPI {
+        + POST /message
+        + json: text
+        + Returns: status_code
+    }
+
+    interface AudioDevice {
+        + InputStream(samplerate, blocksize, channels, callback)
+        + Microphone audio input
+    }
+}
+
+VoiceInput --|> DMSLMMain
+VoiceInput *-- WakeWordDetector
+VoiceInput *-- AudioProcessor
+VoiceInput *-- TranscriptionClient
+VoiceInput --> AudioDevice
+TranscriptionClient --> TranscriptionAPI
+VoiceInput --> MessageAPI
+VoiceInput --> DMSLMMain
+
+@enduml

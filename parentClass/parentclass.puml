@@ -1,0 +1,92 @@
+@startuml parentclass_diagram
+title DMSLMMain - Parent Class Architecture
+
+package "parentClass" {
+
+    class DebugQueue {
+        + put(item, *args, **kwargs) : void
+        + get(*args, **kwargs) : item
+        --
+        - Logs all queue operations
+        - Prints [QUEUE PUT] and [QUEUE GET]
+    }
+
+    class DMSLMMain {
+
+        - FRAME_HEIGHT: int = 480
+        - FRAME_WIDTH: int = 640
+        - FRAME_CHANNELS: int = 3
+        - RING_BUFFER_SIZE: int = 3
+        - shared_frames: np.ndarray
+
+        - session: bool = False
+        - UserCanSpeak: bool = True
+        - last_active_time: float
+        - messages: list
+        - _last_messages_count: int = 0
+
+        - sr: int
+        - data: np.ndarray
+
+        - imageQueue: Queue
+        - processdImageJsonQueue: Queue
+
+        - textOutputQueue: Queue
+        - event_queue: Queue
+
+        - Dataqueue: Queue
+        - piper_audio_queue: Queue
+        - toolResponseCacheq: Queue
+
+        - audio_player_thread: Thread
+
+        --
+        + __init__() : void
+        + display_queue() : void
+        + enable_session_nd_mic() : void
+        + _main_play_audio() : void
+        + clearCacheOnEndOfSession() : void
+    }
+
+    class SessionMonitor {
+        - timeout_sec: int = 7
+        - session_active: bool
+        - last_activity_time: float
+        --
+        - check_session_timeout() : bool
+        - end_session() : void
+        - play_end_session_audio() : void
+    }
+
+    class AudioPlaybackEngine {
+        - sample_rate: int = 22050
+        - channels: int = 1
+        - dtype: str = "int16"
+        - speaking: bool = False
+        --
+        - create_output_stream() : OutputStream
+        - process_audio_bytes() : void
+        - handle_tts_end_signal() : void
+        - update_activity_time() : void
+    }
+}
+
+package "config" {
+    class SYSTEMPROMPT {
+        - System message for LLM initialization
+    }
+}
+
+package "External API" {
+    interface LLMCacheAPI {
+        + POST /clear-history
+    }
+}
+
+DMSLMMain *-- SessionMonitor
+DMSLMMain *-- AudioPlaybackEngine
+DMSLMMain --> SYSTEMPROMPT
+DMSLMMain --> LLMCacheAPI
+DebugQueue --|> queue.Queue
+
+@enduml
